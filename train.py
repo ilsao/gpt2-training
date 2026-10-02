@@ -81,9 +81,9 @@ def main():
     training_args = TrainingArguments(
         output_dir=os.path.join(os.environ["GPT2_OUTPUT_ROOT"], run_name),
         run_name=run_name,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=32,
-        gradient_accumulation_steps=8,
+        per_device_train_batch_size=128,
+        per_device_eval_batch_size=128,
+        gradient_accumulation_steps=1,
         max_steps=1000,
         learning_rate=2.5e-4,
         lr_scheduler_type="cosine",
