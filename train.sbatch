@@ -15,8 +15,8 @@ module purge
 set -euo pipefail
 
 # Use the same Python module used to create .venv.
-: "${NANO4_WORK_DIR:?Set NANO4_WORK_DIR to your writable /work directory}"
-: "${NANO4_PYTHON_MODULE:?Set NANO4_PYTHON_MODULE to an available Python module}"
+NANO4_WORK_DIR="${NANO4_WORK_DIR:-/work/asciibase64}"
+NANO4_PYTHON_MODULE="${NANO4_PYTHON_MODULE:-miniconda3/26.1.1}"
 module load "$NANO4_PYTHON_MODULE"
 
 cd "$SLURM_SUBMIT_DIR"
