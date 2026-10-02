@@ -1,0 +1,42 @@
+# Python bytecode and tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Training outputs and downloaded data
+checkpoints/
+outputs/
+runs/
+logs/
+wandb/
+data/
+.cache/
+
+# Slurm job output
+slurm-*.out
+slurm-*.err
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
