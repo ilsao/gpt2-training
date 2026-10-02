@@ -79,7 +79,7 @@ def main():
         eval_dataset = Dataset.from_list(list(eval_dataset.take(1024)))
 
     training_args = TrainingArguments(
-        output_dir=f"/work/gpt2-pretrain/{run_name}",
+        output_dir=os.path.join(os.environ["GPT2_OUTPUT_ROOT"], run_name),
         run_name=run_name,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
@@ -108,7 +108,7 @@ def main():
         save_steps=250,
         save_total_limit=2,
         seed=42,
-        tourch_compile=True
+        torch_compile=True,
     )
 
     trainer = Trainer(
