@@ -16,8 +16,15 @@ export NANO4_WORK_DIR=/work/asciibase64
 export HF_HOME="$NANO4_WORK_DIR/huggingface"
 export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
 export GPT2_DATA_DIR="$NANO4_WORK_DIR/gpt2-data/c4-1024"
-python prepare_dataset.py --output-dir "$GPT2_DATA_DIR"
+mkdir -p logs
+sbatch prepare.sbatch
 ```
+
+Wait for the preparation job to finish successfully and print `Prepared ...` in
+`logs/gpt2-data-<job-id>.out`, then run `bash submit.sh` to submit training/upload.
+`prepare.sbatch` has its own 4-hour limit and uses the existing `8gpus` partition,
+2 GPU allocation, 12 CPUs, and 128 GB RAM. The preparation program uses only CPU;
+this allocation is independent of the training job's 30-minute limit.
 
 Preparation runs separately from the 30-minute GPU training allocation. It streams
 English `allenai/c4` into disk-backed Arrow shards: 1,280,000 training blocks and
@@ -32,8 +39,9 @@ training allocation sets `HF_HUB_OFFLINE=1` and `HF_DATASETS_OFFLINE=1` and read
 only the prepared local files. Missing or invalid prepared data fails validation
 before submission; training never falls back to preparing or downloading it.
 
-Use `--train-blocks N --eval-blocks N` for a smaller dataset. If training exhausts
-a smaller dataset, Trainer starts another epoch until the step/time limit.
+Use `sbatch prepare.sbatch --train-blocks N --eval-blocks N` for a smaller dataset.
+If training exhausts a smaller dataset, Trainer starts another epoch until the
+step/time limit.
 Packing retains document EOS tokens and labels, seed 42, shuffle buffer 10000,
 and drops the partial block at the end of each 1000-document batch.
 
@@ -132,7 +140,7 @@ The complete checkpoint can be passed to Trainer's `resume_from_checkpoint`.
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
-bash -n job_env.sh submit.sh train.sbatch upload.sbatch
+bash -n job_env.sh submit.sh prepare.sbatch train.sbatch upload.sbatch
 ```
 
 Tests use local synthetic data/model/tokenizer, two CPU ranks, mocked Slurm, and

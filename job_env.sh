@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared environment for submission, training, and upload jobs.
+# Shared environment for submission, data preparation, training, and upload jobs.
 module purge
 export NANO4_WORK_DIR="${NANO4_WORK_DIR:-/work/asciibase64}"
 export NANO4_PYTHON_MODULE="${NANO4_PYTHON_MODULE:-miniconda3/26.1.1}"
