@@ -211,14 +211,17 @@ with open(os.environ["MOCK_LOG"], "a") as stream:
 if name == "python" and os.environ.get("MOCK_PREFLIGHT_FAIL"):
     sys.exit(1)
 if name == "sbatch":
-    if "--hold" in sys.argv:
+    if "train.sbatch" in sys.argv:
         print("123;cluster")
     elif os.environ.get("MOCK_UPLOAD_FAIL"):
         sys.exit(1)
     else:
+        marker = Path(sys.argv[-1]) / "upload-registered"
+        if marker.exists():
+            sys.exit(2)
+        if os.environ.get("MOCK_MARKER_FAIL"):
+            marker.mkdir(parents=True)
         print("456")
-if name == "scontrol" and os.environ.get("MOCK_RELEASE_FAIL"):
-    sys.exit(1)
 if name == "torchrun":
     Path(os.environ["MOCK_READY"]).touch()
     stop = Path(os.environ["GPT2_OUTPUT_ROOT"]) / "gpt2-123/stop-requested"
@@ -260,24 +263,25 @@ class SlurmTests(unittest.TestCase):
         return subprocess.run(["bash", "submit.sh"], cwd=self.root, env={**self.env, **extra},
                               capture_output=True, text=True, timeout=10)
 
-    def test_dependency_registered_before_release(self):
+    def test_dependency_registered_before_ready_marker(self):
         result = self.submit()
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = [row for row in self.calls() if row[0] in ("sbatch", "scontrol", "scancel")]
         self.assertEqual(calls, [
-            ["sbatch", "--parsable", "--hold", "train.sbatch"],
+            ["sbatch", "--parsable", "train.sbatch", "--wait-for-upload"],
             ["sbatch", "--parsable", "--dependency=afterany:123", "upload.sbatch", str(self.root / "outputs/gpt2-123")],
-            ["scontrol", "release", "123"],
         ])
+        self.assertEqual((self.root / "outputs/gpt2-123/upload-registered").read_text(), "456\n")
 
-    def test_upload_registration_failure_cancels_held_training(self):
+    def test_upload_registration_failure_cancels_waiting_training(self):
         result = self.submit(MOCK_UPLOAD_FAIL="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(["scancel", "123"], self.calls())
         self.assertFalse(any(row[0] == "scontrol" for row in self.calls()))
+        self.assertFalse((self.root / "outputs/gpt2-123/upload-registered").exists())
 
-    def test_release_failure_cancels_both_jobs(self):
-        result = self.submit(MOCK_RELEASE_FAIL="1")
+    def test_marker_publication_failure_cancels_both_jobs(self):
+        result = self.submit(MOCK_MARKER_FAIL="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls()[-2:], [["scancel", "456"], ["scancel", "123"]])
 
@@ -287,7 +291,10 @@ class SlurmTests(unittest.TestCase):
         self.assertFalse(any(row[0] == "sbatch" for row in self.calls()))
 
     def test_batch_usr1_waits_for_real_training_exit_status(self):
-        process = subprocess.Popen(["bash", "train.sbatch"], cwd=self.root, env=self.env,
+        run_dir = self.root / "outputs/gpt2-123"
+        run_dir.mkdir(parents=True)
+        (run_dir / "upload-registered").write_text("456\n")
+        process = subprocess.Popen(["bash", "train.sbatch", "--wait-for-upload"], cwd=self.root, env=self.env,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             end = time.monotonic() + 5

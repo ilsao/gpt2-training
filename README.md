@@ -62,11 +62,29 @@ as above; never commit credentials. Override the target with `HF_HUB_REPO`.
 bash submit.sh
 ```
 
-Submission validates the local data, submits a held training job, registers an
-upload job with `afterany:<training-job-id>`, then releases training. Registration
-or release failures cancel the jobs created by the submission. Use this entrypoint
-for automatic uploading; submitting `train.sbatch` alone does not register an
-uploader. The script prints both job IDs and the exact run directory.
+Submission validates the local data, submits training with `--wait-for-upload`,
+registers an upload job with `afterany:<training-job-id>`, then atomically publishes
+`upload-registered` in the shared run directory. Training waits for this marker
+before starting `torchrun`; it exits if registration has not arrived within 120
+seconds of the wait starting. Registration or marker publication failures cancel
+the jobs created by the submission. This avoids `sbatch --hold` / `scontrol
+release`, which failed during submission on nano4. The brief wait, if the job is
+allocated immediately, is within the 30-minute allocation; dataset preparation
+remains entirely separate. Use this entrypoint for automatic uploading; submitting
+`train.sbatch` alone does not register an uploader. The script prints each job ID
+as soon as it is submitted, the exact run directory, and the phase on failure.
+
+If an older submission prints `Unspecified error for job <id>`, inspect its state
+before resubmitting:
+
+```bash
+sacct -j TRAINING_JOB_ID --format=JobID,JobName,State,ExitCode
+squeue -u "$USER"
+```
+
+The old script attempted to cancel both jobs after a release failure. Sync the
+updated `submit.sh` and `train.sbatch` to nano4, then run `bash submit.sh` again.
+The prepared dataset can be reused.
 
 Both jobs use account `ACD115198`, partition `8gpus`, 2 GPUs, 12 CPUs, and 128 GB
 RAM. Training uses `torchrun` with two ranks and a **30-minute allocation limit**.

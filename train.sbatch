@@ -34,6 +34,29 @@ trap request_stop USR1 TERM INT
 # Older Slurm installations may not export the projected end timestamp.
 export GPT2_TRAIN_DEADLINE="${SLURM_JOB_END_TIME:-$((${SLURM_JOB_START_TIME:-$(date +%s)} + 1800))}"
 
+# submit.sh publishes this marker only after the afterany uploader is registered.
+# The job may be allocated immediately, but torchrun must wait for registration.
+if [[ "${1:-}" == "--wait-for-upload" ]]; then
+    registration_deadline=$(($(date +%s) + 120))
+    echo "Waiting for upload registration: $run_dir/upload-registered"
+    while [[ ! -s "$run_dir/upload-registered" ]]; do
+        if [[ -e "$run_dir/stop-requested" ]]; then
+            echo "Stopped before upload registration; training did not start." >&2
+            exit 1
+        fi
+        if (( $(date +%s) >= registration_deadline )); then
+            echo "Upload registration timed out after 120 seconds; training did not start." >&2
+            exit 1
+        fi
+        sleep 1 || true
+    done
+    echo "Upload job registered: $(cat "$run_dir/upload-registered")"
+fi
+if [[ -e "$run_dir/stop-requested" ]]; then
+    echo "Stop requested before training started." >&2
+    exit 1
+fi
+
 nvidia-smi
 python -c 'import torch; assert torch.cuda.is_available(); assert torch.cuda.device_count() == 2; assert torch.cuda.is_bf16_supported(); print("PyTorch:", torch.__version__, "CUDA:", torch.version.cuda)'
 
