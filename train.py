@@ -107,6 +107,9 @@ def main():
         save_strategy="steps",
         save_steps=250,
         save_total_limit=2,
+        push_to_hub=True,
+        hub_model_id="asciibase64/gpt2-c4",
+        hub_strategy="every_save",
         seed=42,
         torch_compile=True,
     )
@@ -121,9 +124,8 @@ def main():
     )
 
     trainer.train()
-    trainer.save_model(f"{training_args.output_dir}/final")
-    if trainer.is_world_process_zero():
-        tokenizer.save_pretrained(f"{training_args.output_dir}/final")
+    # Saves model and tokenizer in output_dir, then waits for the final upload.
+    trainer.push_to_hub(commit_message=f"Finish training {run_name}", blocking=True)
 
 
 if __name__ == "__main__":
