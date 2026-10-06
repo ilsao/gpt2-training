@@ -11,12 +11,20 @@ the matching CUDA toolkit, then run these commands from this repository. Install
 PyTorch and build tools before FlashAttention, which builds against the installed
 PyTorch with build isolation disabled, as described in the
 [FlashAttention installation instructions](https://github.com/Dao-AILab/flash-attention#installation-and-features).
+Git must also be available: `requirements.txt` pins an official FlashAttention 2
+source commit containing the
+[C++20 build fix for PyTorch 2.13+](https://github.com/Dao-AILab/flash-attention/pull/2899).
+The older PyPI source forces C++17 and fails against newer PyTorch headers with
+errors such as `std::strong_ordering` or `requires`. This is an unreleased source
+snapshot; the commands below compile it against the installed PyTorch rather
+than downloading a prebuilt wheel.
 
 ```bash
 module load miniconda3/26.1.1
 source .venv/bin/activate
-pip install torch packaging psutil ninja setuptools wheel
-pip install -r requirements.txt --no-build-isolation
+python -m pip install torch packaging psutil ninja setuptools wheel
+FLASH_ATTENTION_FORCE_BUILD=TRUE MAX_JOBS=4 NVCC_THREADS=2 \
+    python -m pip install -r requirements.txt --no-build-isolation
 export NANO4_WORK_DIR=/work/asciibase64
 export HF_HOME="$NANO4_WORK_DIR/huggingface"
 export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
@@ -24,6 +32,12 @@ export GPT2_DATA_DIR="$NANO4_WORK_DIR/gpt2-data/c4-1024"
 mkdir -p logs
 sbatch prepare.sbatch
 ```
+
+If a previous installation failed with the C++20 errors, sync the updated
+`requirements.txt` and repeat the installation command in the existing nano4
+virtual environment. For PyTorch `2.14.1+cu130`, use a CUDA 13.0 toolkit and a
+host compiler supported by that toolkit. Source compilation can take time and
+must finish before submitting the training allocation.
 
 Wait for the preparation job to finish successfully and print `Prepared ...` in
 `logs/gpt2-data-<job-id>.out`, then run `bash submit.sh` to submit training/upload.

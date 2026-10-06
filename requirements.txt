@@ -5,4 +5,5 @@ accelerate
 huggingface_hub
 wandb
 # Install torch and build tools first; see README.md for the CUDA host setup.
-flash-attn>=2.3.6,<3
+# Official FA2 source with C++20 support for PyTorch 2.13+ (upstream PR #2899).
+flash-attn @ git+https://github.com/Dao-AILab/flash-attention.git@edb5c76ee329b18ed95d1f7ea9aa522a1331ab7d
