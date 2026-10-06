@@ -17,7 +17,8 @@ BLOCK_SIZE = 1024
 SEED = 42
 SHUFFLE_BUFFER = 10000
 DOCUMENT_BATCH_SIZE = 1000
-DEFAULT_TRAIN_BLOCKS = 1_280_000
+# 8000 optimizer steps × 2 GPUs × batch size 128 × accumulation 1.
+DEFAULT_TRAIN_BLOCKS = 2_048_000
 DEFAULT_EVAL_BLOCKS = 1024
 METADATA = {
     "format_version": 1, "dataset": "allenai/c4", "dataset_config": "en",

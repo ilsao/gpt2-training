@@ -135,7 +135,10 @@ def main():
 
     set_seed(42)
     dataset, tokenizer, config = validate_prepared_dataset(os.environ["GPT2_DATA_DIR"])
-    model = AutoModelForCausalLM.from_config(configure_model(config, tokenizer))
+    # Keep FP32 optimizer weights; Trainer's BF16 autocast supplies FA2 inputs.
+    model = AutoModelForCausalLM.from_config(
+        configure_model(config, tokenizer), attn_implementation="flash_attention_2",
+    )
     output_dir = Path(os.environ["GPT2_OUTPUT_ROOT"]) / run_name
     deadline = os.environ.get("GPT2_TRAIN_DEADLINE", os.environ.get("SLURM_JOB_END_TIME"))
     shutdown = ShutdownCallback(output_dir / "stop-requested", float(deadline) if deadline else None)
@@ -148,13 +151,13 @@ def main():
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
         gradient_accumulation_steps=1,
-        max_steps=5000,
+        max_steps=8000,
         learning_rate=1.25e-3,
         lr_scheduler_type="linear",
-        warmup_steps=100,
+        warmup_steps=80,
         weight_decay=0.1,
         adam_beta1=0.9,
-        adam_beta2=0.999,
+        adam_beta2=0.95,
         adam_epsilon=1e-8,
         max_grad_norm=1.0,
         bf16=True,
@@ -162,14 +165,14 @@ def main():
         ddp_find_unused_parameters=False,
         dataloader_num_workers=4,
         report_to="wandb",
-        logging_steps=10,
+        logging_steps=100,
         logging_first_step=True,
         include_num_input_tokens_seen=True,
         eval_strategy="steps",
-        eval_steps=1000,
+        eval_steps=2000,
         prediction_loss_only=True,
         save_strategy="steps",
-        save_steps=250,
+        save_steps=2000,
         save_total_limit=2,
         push_to_hub=False,
         seed=42,

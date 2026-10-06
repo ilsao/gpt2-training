@@ -4,3 +4,5 @@ datasets
 accelerate
 huggingface_hub
 wandb
+# Install torch and build tools first; see README.md for the CUDA host setup.
+flash-attn>=2.3.6,<3

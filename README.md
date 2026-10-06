@@ -1,17 +1,22 @@
 # gpt2-training
 
 Offline C4 preparation, two-GPU GPT-2 training, and a separate Hugging Face upload
-job. Dropout is disabled and GeLU uses PyTorch's native tanh approximation.
+job. Attention uses FlashAttention 2 with BF16 mixed precision. Dropout is disabled
+and GeLU uses PyTorch's native tanh approximation.
 
 ## Prepare data once
 
-On the training machine, load the Python module used to create `.venv`, install
-`requirements.txt`, and run these commands from this repository:
+On the CUDA training machine, load the Python module used to create `.venv` and
+the matching CUDA toolkit, then run these commands from this repository. Install
+PyTorch and build tools before FlashAttention, which builds against the installed
+PyTorch with build isolation disabled, as described in the
+[FlashAttention installation instructions](https://github.com/Dao-AILab/flash-attention#installation-and-features).
 
 ```bash
 module load miniconda3/26.1.1
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install torch packaging psutil ninja setuptools wheel
+pip install -r requirements.txt --no-build-isolation
 export NANO4_WORK_DIR=/work/asciibase64
 export HF_HOME="$NANO4_WORK_DIR/huggingface"
 export HF_TOKEN_PATH="$HOME/.cache/huggingface/token"
@@ -27,10 +32,10 @@ Wait for the preparation job to finish successfully and print `Prepared ...` in
 this allocation is independent of the training job's 30-minute limit.
 
 Preparation runs separately from the 30-minute GPU training allocation. It streams
-English `allenai/c4` into disk-backed Arrow shards: 1,280,000 training blocks and
-1024 validation blocks, each containing 1024 tokens. This covers 5000 steps at
+English `allenai/c4` into disk-backed Arrow shards: 2,048,000 training blocks and
+1024 validation blocks, each containing 1024 tokens. This covers 8000 steps at
 2 GPUs × batch size 128 without repeating an epoch. Token IDs and labels occupy
-about 10.5 GB before Arrow overhead; allow additional space for the temporary
+about 16.8 GB before Arrow overhead; allow additional space for the temporary
 generator cache and Hugging Face downloads during preparation.
 
 All dataset downloads, tokenization, and packing finish before training is
@@ -48,6 +53,10 @@ and drops the partial block at the end of each 1000-document batch.
 The published directory contains `dataset/`, `tokenizer/`, `config/`, and
 `metadata.json`. It appears only when preparation and validation succeed.
 An existing output directory is never overwritten; use a new path to rebuild.
+To replace data prepared for 5000 steps, set a new path such as
+`GPT2_DATA_DIR="$NANO4_WORK_DIR/gpt2-data/c4-1024-8000"` before submitting both
+preparation and training; the previous 1,280,000-block dataset would repeat data
+to reach 8000 steps.
 `train.py` reads this directory through `GPT2_DATA_DIR`, without downloading or
 tokenizing C4 or fetching model/tokenizer files. The dataset and output paths
 must be on shared storage accessible to both jobs.
@@ -107,7 +116,7 @@ The environment defaults can be overridden before submission:
 ## Checkpoints and interruptions
 
 Outputs live in `$GPT2_OUTPUT_ROOT/gpt2-<training-job-id>/`. Checkpoints are saved
-after the first completed step, every 250 steps, whenever 5 minutes have elapsed
+after the first completed step, every 2000 steps, whenever 5 minutes have elapsed
 since the last save, and at normal or requested shutdown. Wall-clock checks occur
 at optimizer step boundaries, so a long step may extend the save interval.
 
